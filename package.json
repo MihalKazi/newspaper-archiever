@@ -1,0 +1,25 @@
+{
+  "name": "newspaper-archiver",
+  "version": "1.0.0",
+  "description": "A powerful local newspaper archiving tool that scrapes articles, media, and metadata",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "scrape": "node src/cli.js"
+  },
+  "keywords": ["scraper", "archiver", "newspaper", "articles"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "playwright": "^1.40.0",
+    "cheerio": "^1.0.0-rc.12",
+    "axios": "^1.6.2",
+    "csv-writer": "^1.6.0",
+    "sanitize-filename": "^1.6.3",
+    "mime-types": "^2.1.35",
+    "ora": "^5.4.1",
+    "chalk": "^4.1.2",
+    "date-fns": "^2.30.0"
+  }
+}

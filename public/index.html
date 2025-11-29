@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Newspaper Archiver</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      font-size: 3em;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .header p {
+      font-size: 1.2em;
+      opacity: 0.9;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      margin-bottom: 20px;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .checkbox-group label {
+      margin: 0;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+
+    .status.active {
+      display: block;
+    }
+
+    .status-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .status-badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-badge.started { background: #fef3c7; color: #92400e; }
+    .status-badge.discovering { background: #dbeafe; color: #1e40af; }
+    .status-badge.scraping { background: #e0e7ff; color: #3730a3; }
+    .status-badge.saving { background: #fce7f3; color: #831843; }
+    .status-badge.completed { background: #d1fae5; color: #065f46; }
+    .status-badge.failed { background: #fee2e2; color: #991b1b; }
+
+    .progress-bar {
+      width: 100%;
+      height: 30px;
+      background: #e0e0e0;
+      border-radius: 15px;
+      overflow: hidden;
+      margin-bottom: 15px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .stat {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2em;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    .logs {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+
+    .log-entry {
+      padding: 8px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      gap: 10px;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-time {
+      color: #999;
+      flex-shrink: 0;
+    }
+
+    .log-message {
+      color: #333;
+    }
+
+    .log-entry.error .log-message {
+      color: #dc2626;
+      font-weight: 600;
+    }
+
+    .download-section {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f0fdf4;
+      border-radius: 8px;
+      border: 2px dashed #10b981;
+    }
+
+    .download-section h3 {
+      color: #065f46;
+      margin-bottom: 15px;
+    }
+
+    .download-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .download-btn {
+      padding: 10px 20px;
+      background: #10b981;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .download-btn:hover {
+      background: #059669;
+    }
+
+    .examples {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .examples h4 {
+      margin-bottom: 10px;
+      color: #374151;
+    }
+
+    .examples ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .examples li {
+      padding: 5px 0;
+      color: #6b7280;
+    }
+
+    .examples a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .examples a:hover {
+      text-decoration: underline;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📰 Newspaper Archiver</h1>
+      <p>Archive articles from any newspaper website locally</p>
+    </div>
+
+    <div class="card">
+      <form id="scrapeForm">
+        <div class="input-group">
+          <label for="url">Newspaper Website URL</label>
+          <input 
+            type="text" 
+            id="url" 
+            name="url" 
+            placeholder="https://example-newspaper.com"
+            required
+          >
+        </div>
+
+        <div class="options">
+          <div class="checkbox-group">
+            <input type="checkbox" id="downloadMedia" checked>
+            <label for="downloadMedia">Download Media</label>
+          </div>
+          <div class="checkbox-group">
+            <input type="checkbox" id="saveHTML" checked>
+            <label for="saveHTML">Save HTML</label>
+          </div>
+          <div class="checkbox-group">
+            <input type="checkbox" id="saveMarkdown" checked>
+            <label for="saveMarkdown">Save Markdown</label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn" id="scrapeBtn">
+          Start Archiving
+        </button>
+      </form>
+
+      <div class="examples">
+        <h4>💡 Example Newspaper Sites:</h4>
+        <ul>
+          <li><a href="#" onclick="fillUrl('https://www.bbc.com/news'); return false;">BBC News</a></li>
+          <li><a href="#" onclick="fillUrl('https://www.theguardian.com'); return false;">The Guardian</a></li>
+          <li><a href="#" onclick="fillUrl('https://www.reuters.com'); return false;">Reuters</a></li>
+          <li><a href="#" onclick="fillUrl('https://www.aljazeera.com'); return false;">Al Jazeera</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card status" id="statusCard">
+      <div class="status-header">
+        <h2>Archiving Progress</h2>
+        <span class="status-badge" id="statusBadge">Started</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="articlesFound">0</div>
+          <div class="stat-label">Articles Found</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="articlesScraped">0</div>
+          <div class="stat-label">Scraped</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="articlesFailed">0</div>
+          <div class="stat-label">Failed</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="duration">0s</div>
+          <div class="stat-label">Duration</div>
+        </div>
+      </div>
+
+      <h3 style="margin-bottom: 10px;">Activity Log</h3>
+      <div class="logs" id="logs"></div>
+
+      <div class="download-section" id="downloadSection" style="display: none;">
+        <h3>✅ Archive Complete!</h3>
+        <p style="margin-bottom: 15px; color: #065f46;">Your articles have been archived. Check the archives folder.</p>
+        <div class="download-links">
+          <a href="#" class="download-btn" id="viewArchiveBtn">View Archive Folder</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentJobId = null;
+    let statusInterval = null;
+
+    function fillUrl(url) {
+      document.getElementById('url').value = url;
+    }
+
+    document.getElementById('scrapeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const url = document.getElementById('url').value;
+      const scrapeBtn = document.getElementById('scrapeBtn');
+      const statusCard = document.getElementById('statusCard');
+
+      scrapeBtn.disabled = true;
+      scrapeBtn.innerHTML = '<span class="spinner"></span> Starting...';
+      statusCard.classList.add('active');
+
+      try {
+        const response = await fetch('/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+        currentJobId = data.jobId;
+
+        // Start polling for status
+        statusInterval = setInterval(updateStatus, 1000);
+
+      } catch (error) {
+        alert('Failed to start scraping: ' + error.message);
+        scrapeBtn.disabled = false;
+        scrapeBtn.textContent = 'Start Archiving';
+      }
+    });
+
+    async function updateStatus() {
+      if (!currentJobId) return;
+
+      try {
+        const response = await fetch(`/api/status/${currentJobId}`);
+        const job = await response.json();
+
+        // Update badge
+        const statusBadge = document.getElementById('statusBadge');
+        statusBadge.textContent = job.status;
+        statusBadge.className = `status-badge ${job.status}`;
+
+        // Update progress
+        const progressFill = document.getElementById('progressFill');
+        progressFill.style.width = job.progress + '%';
+        progressFill.textContent = job.progress + '%';
+
+        // Update stats
+        document.getElementById('articlesFound').textContent = job.articlesFound;
+        document.getElementById('articlesScraped').textContent = job.articlesScraped;
+        document.getElementById('articlesFailed').textContent = job.articlesFailed;
+
+        if (job.duration) {
+          document.getElementById('duration').textContent = job.duration + 's';
+        } else {
+          const elapsed = Math.round((Date.now() - job.startTime) / 1000);
+          document.getElementById('duration').textContent = elapsed + 's';
+        }
+
+        // Update logs
+        const logsDiv = document.getElementById('logs');
+        logsDiv.innerHTML = job.logs.slice(-20).reverse().map(log => {
+          const time = new Date(log.time).toLocaleTimeString();
+          const className = log.level === 'error' ? 'log-entry error' : 'log-entry';
+          return `
+            <div class="${className}">
+              <span class="log-time">[${time}]</span>
+              <span class="log-message">${log.message}</span>
+            </div>
+          `;
+        }).join('');
+
+        // Check if completed
+        if (job.status === 'completed' || job.status === 'failed') {
+          clearInterval(statusInterval);
+          const scrapeBtn = document.getElementById('scrapeBtn');
+          scrapeBtn.disabled = false;
+          scrapeBtn.textContent = 'Start Archiving';
+
+          if (job.status === 'completed') {
+            const downloadSection = document.getElementById('downloadSection');
+            downloadSection.style.display = 'block';
+            document.getElementById('viewArchiveBtn').href = '/archives';
+          }
+        }
+
+      } catch (error) {
+        console.error('Failed to update status:', error);
+      }
+    }
+  </script>
+</body>
+</html>
