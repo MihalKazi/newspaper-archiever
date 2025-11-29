@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Newspaper Archiver</title>
+  <title>Newspaper Article Archiver</title>
   <style>
     * {
       margin: 0;
@@ -73,31 +73,6 @@
       border-color: #667eea;
     }
 
-    .options {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .checkbox-group input[type="checkbox"] {
-      width: 20px;
-      height: 20px;
-      cursor: pointer;
-    }
-
-    .checkbox-group label {
-      margin: 0;
-      cursor: pointer;
-      font-weight: 500;
-    }
-
     .btn {
       width: 100%;
       padding: 15px;
@@ -124,6 +99,26 @@
       background: #ccc;
       cursor: not-allowed;
       transform: none;
+    }
+
+    .info-box {
+      background: #e0e7ff;
+      border-left: 4px solid #667eea;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .info-box h3 {
+      color: #3730a3;
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .info-box p {
+      color: #4338ca;
+      font-size: 14px;
+      line-height: 1.5;
     }
 
     .status {
@@ -154,7 +149,7 @@
     }
 
     .status-badge.started { background: #fef3c7; color: #92400e; }
-    .status-badge.discovering { background: #dbeafe; color: #1e40af; }
+    .status-badge.initializing { background: #dbeafe; color: #1e40af; }
     .status-badge.scraping { background: #e0e7ff; color: #3730a3; }
     .status-badge.saving { background: #fce7f3; color: #831843; }
     .status-badge.completed { background: #d1fae5; color: #065f46; }
@@ -181,30 +176,36 @@
       font-size: 14px;
     }
 
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 15px;
+    .article-info {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
       margin-bottom: 15px;
     }
 
-    .stat {
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      text-align: center;
+    .article-info h3 {
+      color: #333;
+      margin-bottom: 15px;
     }
 
-    .stat-value {
-      font-size: 2em;
-      font-weight: 700;
-      color: #667eea;
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
     }
 
-    .stat-label {
-      font-size: 0.9em;
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      font-weight: 600;
       color: #666;
-      margin-top: 5px;
+    }
+
+    .info-value {
+      color: #333;
     }
 
     .logs {
@@ -255,26 +256,6 @@
       margin-bottom: 15px;
     }
 
-    .download-links {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .download-btn {
-      padding: 10px 20px;
-      background: #10b981;
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
-      font-weight: 600;
-      transition: background 0.2s;
-    }
-
-    .download-btn:hover {
-      background: #059669;
-    }
-
     .examples {
       margin-top: 20px;
       padding: 15px;
@@ -293,7 +274,7 @@
     }
 
     .examples li {
-      padding: 5px 0;
+      padding: 8px 0;
       color: #6b7280;
     }
 
@@ -301,6 +282,7 @@
       color: #667eea;
       text-decoration: none;
       font-weight: 500;
+      word-break: break-all;
     }
 
     .examples a:hover {
@@ -320,55 +302,145 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    .tip {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #92400e;
+    }
+
+    .footer {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 25px;
+      margin-top: 30px;
+      text-align: center;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+
+    .footer-content {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .footer h3 {
+      color: #333;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .footer .developer {
+      font-size: 16px;
+      color: #667eea;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .footer .email {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+
+    .footer .email a {
+      color: #667eea;
+      text-decoration: none;
+    }
+
+    .footer .email a:hover {
+      text-decoration: underline;
+    }
+
+    .footer .contact-btn {
+      display: inline-block;
+      padding: 12px 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-decoration: none;
+      border-radius: 25px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 10px;
+    }
+
+    .footer .contact-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .footer .copyright {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+      font-size: 13px;
+      color: #999;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>📰 Newspaper Archiver</h1>
-      <p>Archive articles from any newspaper website locally</p>
+      <h1>📰 Article Archiver</h1>
+      <p>Archive any newspaper article with one click</p>
     </div>
 
     <div class="card">
+      <div class="info-box">
+        <h3>📌 Choose Archive Mode</h3>
+        <p>Select what you want to archive: a single article or an entire website.</p>
+      </div>
+
       <form id="scrapeForm">
         <div class="input-group">
-          <label for="url">Newspaper Website URL</label>
+          <label>Archive Mode</label>
+          <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 20px; background: #f0f0f0; border-radius: 8px; flex: 1;">
+              <input type="radio" name="mode" value="article" checked onchange="updateMode()">
+              <div>
+                <div style="font-weight: 600; color: #333;">📄 Single Article</div>
+                <div style="font-size: 12px; color: #666;">Archive one article</div>
+              </div>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 20px; background: #f0f0f0; border-radius: 8px; flex: 1;">
+              <input type="radio" name="mode" value="website" onchange="updateMode()">
+              <div>
+                <div style="font-weight: 600; color: #333;">🌐 Full Website</div>
+                <div style="font-size: 12px; color: #666;">Archive entire site</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="url" id="urlLabel">Article URL</label>
           <input 
             type="text" 
             id="url" 
             name="url" 
-            placeholder="https://example-newspaper.com"
+            placeholder="https://www.example.com/news/article-title"
             required
           >
         </div>
 
-        <div class="options">
-          <div class="checkbox-group">
-            <input type="checkbox" id="downloadMedia" checked>
-            <label for="downloadMedia">Download Media</label>
-          </div>
-          <div class="checkbox-group">
-            <input type="checkbox" id="saveHTML" checked>
-            <label for="saveHTML">Save HTML</label>
-          </div>
-          <div class="checkbox-group">
-            <input type="checkbox" id="saveMarkdown" checked>
-            <label for="saveMarkdown">Save Markdown</label>
-          </div>
-        </div>
-
         <button type="submit" class="btn" id="scrapeBtn">
-          Start Archiving
+          📥 Archive This Article
         </button>
+
+        <div class="tip" id="tipBox">
+          💡 <strong>Tip:</strong> Paste the full URL of the article you want to save
+        </div>
       </form>
 
       <div class="examples">
-        <h4>💡 Example Newspaper Sites:</h4>
+        <h4>💡 Example Article URLs:</h4>
         <ul>
-          <li><a href="#" onclick="fillUrl('https://www.bbc.com/news'); return false;">BBC News</a></li>
-          <li><a href="#" onclick="fillUrl('https://www.theguardian.com'); return false;">The Guardian</a></li>
-          <li><a href="#" onclick="fillUrl('https://www.reuters.com'); return false;">Reuters</a></li>
-          <li><a href="#" onclick="fillUrl('https://www.aljazeera.com'); return false;">Al Jazeera</a></li>
+          <li><a href="#" onclick="fillUrl('https://www.thedailystar.net/business/news/gold-eases-near-two-week-high-investors-book-profits-4044881'); return false;">The Daily Star - Gold Article</a></li>
+          <li><a href="#" onclick="fillUrl('https://www.bbc.com/news/world-us-canada-12345678'); return false;">BBC News Article</a></li>
+          <li><a href="#" onclick="fillUrl('https://www.theguardian.com/world/2024/jan/01/sample-article'); return false;">Guardian Article</a></li>
         </ul>
       </div>
     </div>
@@ -383,22 +455,31 @@
         <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
       </div>
 
-      <div class="stats">
-        <div class="stat">
-          <div class="stat-value" id="articlesFound">0</div>
-          <div class="stat-label">Articles Found</div>
+      <div class="article-info" id="articleInfo" style="display: none;">
+        <h3>📄 Article Details</h3>
+        <div class="info-row">
+          <span class="info-label">Title:</span>
+          <span class="info-value" id="articleTitle">-</span>
         </div>
-        <div class="stat">
-          <div class="stat-value" id="articlesScraped">0</div>
-          <div class="stat-label">Scraped</div>
+        <div class="info-row">
+          <span class="info-label">Author:</span>
+          <span class="info-value" id="articleAuthor">-</span>
         </div>
-        <div class="stat">
-          <div class="stat-value" id="articlesFailed">0</div>
-          <div class="stat-label">Failed</div>
+        <div class="info-row">
+          <span class="info-label">Published:</span>
+          <span class="info-value" id="articleDate">-</span>
         </div>
-        <div class="stat">
-          <div class="stat-value" id="duration">0s</div>
-          <div class="stat-label">Duration</div>
+        <div class="info-row">
+          <span class="info-label">Words:</span>
+          <span class="info-value" id="articleWords">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Images:</span>
+          <span class="info-value" id="articleImages">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Videos:</span>
+          <span class="info-value" id="articleVideos">-</span>
         </div>
       </div>
 
@@ -406,10 +487,24 @@
       <div class="logs" id="logs"></div>
 
       <div class="download-section" id="downloadSection" style="display: none;">
-        <h3>✅ Archive Complete!</h3>
-        <p style="margin-bottom: 15px; color: #065f46;">Your articles have been archived. Check the archives folder.</p>
-        <div class="download-links">
-          <a href="#" class="download-btn" id="viewArchiveBtn">View Archive Folder</a>
+        <h3>✅ Article Archived Successfully!</h3>
+        <p style="margin-bottom: 10px; color: #065f46;">Your article has been saved to the archives folder.</p>
+        <p style="color: #065f46; font-size: 14px;"><strong>Location:</strong> <span id="archiveLocation"></span></p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-content">
+        <h3>👨‍💻 Developer</h3>
+        <div class="developer">Kazi Rohanuzzaman Mehal</div>
+        <div class="email">
+          <a href="mailto:rohankazi728@gmail.com">rohankazi728@gmail.com</a>
+        </div>
+        <a href="https://linktr.ee/MihalKazi" target="_blank" rel="noopener noreferrer" class="contact-btn">
+          🔗 Contact Me
+        </a>
+        <div class="copyright">
+          © 2024 Kazi Rohanuzzaman Mehal. All rights reserved.
         </div>
       </div>
     </div>
@@ -418,6 +513,29 @@
   <script>
     let currentJobId = null;
     let statusInterval = null;
+    let currentMode = 'article';
+
+    function updateMode() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      currentMode = mode;
+      
+      const urlLabel = document.getElementById('urlLabel');
+      const urlInput = document.getElementById('url');
+      const scrapeBtn = document.getElementById('scrapeBtn');
+      const tipBox = document.getElementById('tipBox');
+      
+      if (mode === 'article') {
+        urlLabel.textContent = 'Article URL';
+        urlInput.placeholder = 'https://www.example.com/news/article-title';
+        scrapeBtn.innerHTML = '📥 Archive This Article';
+        tipBox.innerHTML = '💡 <strong>Tip:</strong> Paste the full URL of the article you want to save';
+      } else {
+        urlLabel.textContent = 'Website URL';
+        urlInput.placeholder = 'https://www.example.com';
+        scrapeBtn.innerHTML = '🌐 Archive Entire Website';
+        tipBox.innerHTML = '💡 <strong>Tip:</strong> Enter the homepage or main URL of the website. This will download multiple pages for offline viewing.';
+      }
+    }
 
     function fillUrl(url) {
       document.getElementById('url').value = url;
@@ -427,18 +545,23 @@
       e.preventDefault();
       
       const url = document.getElementById('url').value;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
       const scrapeBtn = document.getElementById('scrapeBtn');
       const statusCard = document.getElementById('statusCard');
+      const articleInfo = document.getElementById('articleInfo');
+      const downloadSection = document.getElementById('downloadSection');
 
       scrapeBtn.disabled = true;
       scrapeBtn.innerHTML = '<span class="spinner"></span> Starting...';
       statusCard.classList.add('active');
+      articleInfo.style.display = 'none';
+      downloadSection.style.display = 'none';
 
       try {
         const response = await fetch('/api/scrape', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url, mode: mode === 'article' ? 'single' : 'bulk' })
         });
 
         const data = await response.json();
@@ -450,7 +573,7 @@
       } catch (error) {
         alert('Failed to start scraping: ' + error.message);
         scrapeBtn.disabled = false;
-        scrapeBtn.textContent = 'Start Archiving';
+        updateMode();
       }
     });
 
@@ -471,16 +594,18 @@
         progressFill.style.width = job.progress + '%';
         progressFill.textContent = job.progress + '%';
 
-        // Update stats
-        document.getElementById('articlesFound').textContent = job.articlesFound;
-        document.getElementById('articlesScraped').textContent = job.articlesScraped;
-        document.getElementById('articlesFailed').textContent = job.articlesFailed;
-
-        if (job.duration) {
-          document.getElementById('duration').textContent = job.duration + 's';
-        } else {
-          const elapsed = Math.round((Date.now() - job.startTime) / 1000);
-          document.getElementById('duration').textContent = elapsed + 's';
+        // Update article info if available
+        if (job.articleData) {
+          const articleInfo = document.getElementById('articleInfo');
+          articleInfo.style.display = 'block';
+          document.getElementById('articleTitle').textContent = job.articleData.title || '-';
+          document.getElementById('articleAuthor').textContent = job.articleData.author || '-';
+          document.getElementById('articleDate').textContent = job.articleData.publishDate 
+            ? new Date(job.articleData.publishDate).toLocaleDateString() 
+            : '-';
+          document.getElementById('articleWords').textContent = job.articleData.wordCount || '-';
+          document.getElementById('articleImages').textContent = job.articleData.imageCount || '0';
+          document.getElementById('articleVideos').textContent = job.articleData.videoCount || '0';
         }
 
         // Update logs
@@ -501,12 +626,12 @@
           clearInterval(statusInterval);
           const scrapeBtn = document.getElementById('scrapeBtn');
           scrapeBtn.disabled = false;
-          scrapeBtn.textContent = 'Start Archiving';
+          updateMode();
 
           if (job.status === 'completed') {
             const downloadSection = document.getElementById('downloadSection');
             downloadSection.style.display = 'block';
-            document.getElementById('viewArchiveBtn').href = '/archives';
+            document.getElementById('archiveLocation').textContent = job.archiveDir || 'archives/';
           }
         }
 

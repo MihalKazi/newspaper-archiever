@@ -5,7 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "scrape": "node src/cli.js"
+    "scrape": "node src/cli.js",
+    "article": "node scrape-article.js",
+    "test": "node test-scraper.js",
+    "archive-site": "node site-archiver.js"
   },
   "keywords": ["scraper", "archiver", "newspaper", "articles"],
   "author": "",

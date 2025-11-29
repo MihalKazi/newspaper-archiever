@@ -16,7 +16,7 @@ app.use('/archives', express.static(path.join(__dirname, '..', 'archives')));
 const activeJobs = new Map();
 
 app.post('/api/scrape', async (req, res) => {
-  const { url, options = {} } = req.body;
+  const { url, mode = 'single' } = req.body; // mode: 'single' or 'bulk'
 
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
@@ -33,12 +33,17 @@ app.post('/api/scrape', async (req, res) => {
   
   res.json({ 
     jobId, 
-    message: 'Scraping started',
-    status: 'started' 
+    message: mode === 'single' ? 'Scraping article...' : 'Scraping website...',
+    status: 'started',
+    mode 
   });
 
   // Start scraping in background
-  scrapeNewspaper(jobId, url, options);
+  if (mode === 'single') {
+    scrapeSingleArticle(jobId, url);
+  } else {
+    scrapeBulk(jobId, url);
+  }
 });
 
 app.get('/api/status/:jobId', (req, res) => {
@@ -60,10 +65,132 @@ app.get('/api/jobs', (req, res) => {
   res.json(jobs);
 });
 
-async function scrapeNewspaper(jobId, url, options) {
+async function scrapeSingleArticle(jobId, articleUrl) {
+  const job = {
+    status: 'initializing',
+    url: articleUrl,
+    mode: 'single',
+    progress: 0,
+    articlesFound: 1,
+    articlesScraped: 0,
+    articlesFailed: 0,
+    currentArticle: articleUrl,
+    startTime: Date.now(),
+    logs: []
+  };
+
+  activeJobs.set(jobId, job);
+
+  const scraper = new NewspaperScraper();
+  let storage = null;
+  let downloader = null;
+
+  try {
+    await scraper.initialize();
+    
+    // Get domain from article URL for storage
+    const domain = new URL(articleUrl).hostname;
+    const baseUrl = `https://${domain}`;
+    
+    storage = new StorageManager(baseUrl);
+    await storage.initialize();
+    downloader = new MediaDownloader(storage.getArchiveDir());
+
+    job.status = 'scraping';
+    job.progress = 10;
+    job.logs.push({ time: new Date().toISOString(), message: 'Extracting article content...' });
+
+    // Scrape the single article
+    const article = await scraper.scrapeArticle(articleUrl, (progress) => {
+      job.logs.push({ time: new Date().toISOString(), message: progress.status || 'Processing...' });
+      job.progress = 30;
+    });
+
+    if (!article) {
+      throw new Error('Failed to extract article content');
+    }
+
+    job.progress = 50;
+    job.logs.push({ 
+      time: new Date().toISOString(), 
+      message: `Article extracted: ${article.title}` 
+    });
+
+    // Check for duplicates
+    if (storage.isDuplicate(article)) {
+      job.logs.push({ 
+        time: new Date().toISOString(), 
+        message: `Article already exists in archive - updating...` 
+      });
+    }
+
+    job.progress = 60;
+    job.logs.push({ time: new Date().toISOString(), message: 'Downloading media files...' });
+
+    // Download media
+    const mediaFiles = config.downloadMedia 
+      ? await downloader.downloadMedia(article, storage.generateArticleId(article))
+      : { images: [], videos: [], pdfs: [] };
+
+    job.progress = 80;
+    job.logs.push({ 
+      time: new Date().toISOString(), 
+      message: `Downloaded ${mediaFiles.images.length} images, ${mediaFiles.videos.length} videos` 
+    });
+
+    // Save screenshot if available
+    if (article.screenshot) {
+      mediaFiles.screenshot = await downloader.saveThumbnail(
+        article.screenshot, 
+        storage.generateArticleId(article)
+      );
+    }
+
+    // Save article
+    job.logs.push({ time: new Date().toISOString(), message: 'Saving article...' });
+    await storage.saveArticle(article, mediaFiles);
+    await storage.saveAllFormats();
+
+    job.articlesScraped = 1;
+    job.status = 'completed';
+    job.progress = 100;
+    job.endTime = Date.now();
+    job.duration = Math.round((job.endTime - job.startTime) / 1000);
+    job.archiveDir = storage.getArchiveDir();
+    
+    job.articleData = {
+      title: article.title,
+      author: article.author,
+      publishDate: article.publishDate,
+      wordCount: article.content.split(/\s+/).length,
+      imageCount: mediaFiles.images.length,
+      videoCount: mediaFiles.videos.length
+    };
+
+    job.logs.push({ 
+      time: new Date().toISOString(), 
+      message: `✓ Article archived successfully in ${job.duration}s!` 
+    });
+
+  } catch (error) {
+    job.status = 'failed';
+    job.error = error.message;
+    job.articlesFailed = 1;
+    job.logs.push({ 
+      time: new Date().toISOString(), 
+      message: `Error: ${error.message}`,
+      level: 'error'
+    });
+  } finally {
+    await scraper.close();
+  }
+}
+
+async function scrapeBulk(jobId, url) {
   const job = {
     status: 'initializing',
     url,
+    mode: 'bulk',
     progress: 0,
     articlesFound: 0,
     articlesScraped: 0,

@@ -1,14 +1,14 @@
 {
   "archiveDir": "./archives",
-  "maxConcurrentPages": 3,
-  "pageTimeout": 30000,
+  "maxConcurrentPages": 1,
+  "pageTimeout": 90000,
   "downloadMedia": true,
   "saveHTML": true,
   "saveMarkdown": true,
   "takeScreenshots": false,
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "retryAttempts": 3,
-  "retryDelay": 2000,
+  "retryAttempts": 2,
+  "retryDelay": 5000,
   "scrollDelay": 1000,
   "waitForContent": 3000
 }

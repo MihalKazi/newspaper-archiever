@@ -18,14 +18,19 @@ class MediaDownloader {
       pdfs: []
     };
 
+    // Create temporary media directory
+    const tempMediaDir = path.join(this.baseDir, 'media', 'temp', articleId);
+    await fs.mkdir(tempMediaDir, { recursive: true });
+
     // Download images
     if (article.images && article.images.length > 0) {
-      for (const image of article.images) {
+      for (let i = 0; i < article.images.length; i++) {
+        const image = article.images[i];
         try {
           const filePath = await this.downloadFile(
             image.url,
-            'images',
-            articleId,
+            tempMediaDir,
+            `image_${i + 1}`,
             image.alt || image.title
           );
           if (filePath) {
@@ -44,13 +49,14 @@ class MediaDownloader {
 
     // Download videos
     if (article.videos && article.videos.length > 0) {
-      for (const video of article.videos) {
+      for (let i = 0; i < article.videos.length; i++) {
+        const video = article.videos[i];
         if (video.type !== 'embed') {
           try {
             const filePath = await this.downloadFile(
               video.url,
-              'videos',
-              articleId
+              tempMediaDir,
+              `video_${i + 1}`
             );
             if (filePath) {
               mediaFiles.videos.push({
@@ -74,7 +80,7 @@ class MediaDownloader {
     return mediaFiles;
   }
 
-  async downloadFile(url, type, articleId, description = '') {
+  async downloadFile(url, targetDir, baseName, description = '') {
     try {
       // Check if we've already downloaded this file
       const fileHash = this.hashUrl(url);
@@ -102,17 +108,18 @@ class MediaDownloader {
       }
 
       // Create filename
-      const timestamp = Date.now();
-      const sanitizedDesc = description ? sanitize(description.substring(0, 50)) : '';
-      const filename = sanitizedDesc 
-        ? `${articleId}_${sanitizedDesc}_${timestamp}.${extension}`
-        : `${articleId}_${timestamp}.${extension}`;
+      let filename;
+      if (description) {
+        const sanitizedDesc = sanitize(description.substring(0, 30));
+        filename = `${baseName}_${sanitizedDesc}.${extension}`;
+      } else {
+        filename = `${baseName}.${extension}`;
+      }
 
-      // Create directory structure
-      const typeDir = path.join(this.baseDir, 'media', type);
-      await fs.mkdir(typeDir, { recursive: true });
+      // Clean up filename (remove double extensions, etc.)
+      filename = filename.replace(/\.\./g, '.');
 
-      const filePath = path.join(typeDir, filename);
+      const filePath = path.join(targetDir, filename);
       await fs.writeFile(filePath, response.data);
 
       this.downloadedHashes.add(fileHash);
@@ -130,11 +137,11 @@ class MediaDownloader {
     if (!screenshot) return null;
 
     try {
-      const thumbDir = path.join(this.baseDir, 'media', 'thumbnails');
-      await fs.mkdir(thumbDir, { recursive: true });
+      const tempMediaDir = path.join(this.baseDir, 'media', 'temp', articleId);
+      await fs.mkdir(tempMediaDir, { recursive: true });
 
-      const filename = `${articleId}_screenshot.png`;
-      const filePath = path.join(thumbDir, filename);
+      const filename = `screenshot.png`;
+      const filePath = path.join(tempMediaDir, filename);
       
       await fs.writeFile(filePath, screenshot);
       return path.relative(this.baseDir, filePath);
