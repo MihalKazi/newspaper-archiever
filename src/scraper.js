@@ -11,14 +11,10 @@ class NewspaperScraper {
   }
 
   async initialize() {
-    this.browser = await chromium.launch({ 
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    this.browser = await chromium.launch({ headless: true });
     this.context = await this.browser.newContext({
       userAgent: config.userAgent,
-      viewport: { width: 1920, height: 1080 },
-      ignoreHTTPSErrors: true
+      viewport: { width: 1920, height: 1080 }
     });
   }
 
@@ -33,99 +29,32 @@ class NewspaperScraper {
       const page = await this.context.newPage();
       page.setDefaultTimeout(config.pageTimeout);
 
-      progressCallback({ status: 'loading', message: `Loading ${url}...` });
-      
-      // Try different wait strategies
-      try {
-        await page.goto(url, { 
-          waitUntil: 'domcontentloaded',
-          timeout: config.pageTimeout 
-        });
-      } catch (e) {
-        // If domcontentloaded fails, try networkidle
-        console.log('Retrying with networkidle...');
-        await page.goto(url, { 
-          waitUntil: 'networkidle',
-          timeout: config.pageTimeout 
-        });
-      }
+      progressCallback({ status: 'loading', message: 'Loading ' + url + '...' });
+      await page.goto(url, { 
+        waitUntil: 'domcontentloaded',
+        timeout: 60000 
+      });
 
-      // Wait for content to load
-      await page.waitForTimeout(Math.min(config.waitForContent, 3000));
-
-      // Scroll to load lazy content
+      await page.waitForTimeout(config.waitForContent);
       await this.autoScroll(page);
-
-      // Wait a bit more after scrolling
-      await page.waitForTimeout(2000);
 
       const html = await page.content();
       const $ = cheerio.load(html);
 
       progressCallback({ status: 'discovering', message: 'Discovering articles...' });
-      
-      // Get all links from the page
-      const allLinks = await this.getAllLinks(page);
-      const articleLinks = this.filterArticleLinks(allLinks, url);
-
-      // If no articles found, try alternative discovery
-      if (articleLinks.length === 0) {
-        progressCallback({ status: 'discovering', message: 'Using alternative discovery methods...' });
-        const alternativeLinks = await this.discoverArticleLinksAlternative($, url);
-        articleLinks.push(...alternativeLinks);
-      }
-
-      // Remove duplicates
-      const uniqueLinks = [...new Set(articleLinks)];
+      const articleLinks = await this.discoverArticleLinks($, url);
 
       progressCallback({ 
         status: 'found', 
-        message: `Found ${uniqueLinks.length} articles`,
-        count: uniqueLinks.length 
+        message: 'Found ' + articleLinks.length + ' articles',
+        count: articleLinks.length 
       });
 
       await page.close();
-      return uniqueLinks;
+      return articleLinks;
     } catch (error) {
-      throw new Error(`Failed to scrape website: ${error.message}`);
+      throw new Error('Failed to scrape website: ' + error.message);
     }
-  }
-
-  async getAllLinks(page) {
-    return await page.evaluate(() => {
-      const links = [];
-      document.querySelectorAll('a[href]').forEach(a => {
-        const href = a.href;
-        if (href && href.startsWith('http')) {
-          links.push(href);
-        }
-      });
-      return links;
-    });
-  }
-
-  filterArticleLinks(links, baseUrl) {
-    const domain = new URL(baseUrl).hostname.replace(/^www\./, '');
-    const articleLinks = [];
-
-    for (const link of links) {
-      try {
-        const linkUrl = new URL(link);
-        const linkDomain = linkUrl.hostname.replace(/^www\./, '');
-
-        // Must be same domain
-        if (linkDomain !== domain) continue;
-
-        // Check if it looks like an article
-        if (this.looksLikeArticle(link)) {
-          articleLinks.push(link);
-        }
-      } catch (e) {
-        // Invalid URL, skip
-      }
-    }
-
-    return articleLinks;
   }
 
   async scrapeArticle(articleUrl, progressCallback) {
@@ -137,38 +66,32 @@ class NewspaperScraper {
         page.setDefaultTimeout(config.pageTimeout);
 
         progressCallback({ status: 'loading', url: articleUrl });
-        
-        // Try multiple strategies
+        await page.goto(articleUrl, { 
+          waitUntil: 'domcontentloaded',
+          timeout: 60000 
+        });
+        await page.waitForTimeout(config.waitForContent);
+
+        // Wait for content to appear
         try {
-          await page.goto(articleUrl, { 
-            waitUntil: 'domcontentloaded',
-            timeout: config.pageTimeout 
+          await page.waitForSelector('article, .article, [class*="article"], [class*="content"]', {
+            timeout: 10000
           });
         } catch (e) {
-          console.log('  Retrying with load event...');
-          await page.goto(articleUrl, { 
-            waitUntil: 'load',
-            timeout: config.pageTimeout 
-          });
+          // Content might be elsewhere, continue anyway
         }
-        
-        await page.waitForTimeout(Math.min(config.waitForContent, 2000));
-
-        // Scroll page to load lazy content
-        await this.autoScroll(page);
 
         const html = await page.content();
         const $ = cheerio.load(html);
 
         const article = await this.extractArticleData($, articleUrl, page);
         
-        await page.close();
-        
-        // Validate article has content
+        // Validate that we got meaningful content
         if (!article.content || article.content.length < 100) {
-          throw new Error('Insufficient content extracted');
+          throw new Error('Article content too short or empty');
         }
         
+        await page.close();
         return article;
       } catch (error) {
         retries++;
@@ -199,13 +122,8 @@ class NewspaperScraper {
       html: config.saveHTML ? $.html() : null
     };
 
-    // Take screenshot if enabled
     if (config.takeScreenshots) {
-      try {
-        article.screenshot = await page.screenshot({ fullPage: false });
-      } catch (e) {
-        console.error('Screenshot failed:', e.message);
-      }
+      article.screenshot = await page.screenshot({ fullPage: true });
     }
 
     return article;
@@ -213,14 +131,14 @@ class NewspaperScraper {
 
   extractTitle($) {
     const selectors = [
+      'h1',
       'h1[class*="title"]',
       'h1[class*="headline"]',
-      'h1[class*="head"]',
+      'article h1',
       '.article-title',
       '.post-title',
       '.entry-title',
-      'article h1',
-      'h1',
+      '[itemprop="headline"]',
       'meta[property="og:title"]',
       'meta[name="twitter:title"]',
       'title'
@@ -231,11 +149,8 @@ class NewspaperScraper {
       if (element.length) {
         const text = selector.includes('meta') 
           ? element.attr('content') 
-          : selector === 'title'
-          ? element.text().split('|')[0].split('-')[0].trim()
           : element.text().trim();
-        
-        if (text && text.length > 10 && text.length < 300) {
+        if (text && text.length > 0 && text.length < 300) {
           return text;
         }
       }
@@ -246,18 +161,15 @@ class NewspaperScraper {
 
   extractAuthor($) {
     const selectors = [
-      'a[rel="author"]',
-      '[class*="author-name"]',
-      '[class*="author"] a',
+      '[rel="author"]',
       '.author',
       '.byline',
-      '[class*="byline"]',
+      '.author-name',
+      '[class*="author"]',
       '[itemprop="author"]',
       '[itemprop="author"] [itemprop="name"]',
       'meta[name="author"]',
-      'meta[property="article:author"]',
-      '.writer',
-      '.contributor'
+      'meta[property="article:author"]'
     ];
 
     for (const selector of selectors) {
@@ -266,8 +178,7 @@ class NewspaperScraper {
         const text = selector.includes('meta') 
           ? element.attr('content') 
           : element.text().trim();
-        
-        if (text && text.length > 2 && text.length < 100) {
+        if (text && text.length > 0 && text.length < 100) {
           return text.replace(/^by\s+/i, '').trim();
         }
       }
@@ -280,23 +191,20 @@ class NewspaperScraper {
     const selectors = [
       'time[datetime]',
       '[itemprop="datePublished"]',
-      '[class*="publish-date"]',
-      '[class*="published"]',
+      '.publish-date',
+      '.published',
+      '.date',
       '[class*="date"]',
       'meta[property="article:published_time"]',
       'meta[name="publish_date"]',
-      'meta[property="article:published"]'
+      'meta[name="date"]'
     ];
 
     for (const selector of selectors) {
       const element = $(selector).first();
       if (element.length) {
-        const datetime = element.attr('datetime') || 
-                        element.attr('content') || 
-                        element.text().trim();
-        if (datetime && datetime.length > 0) {
-          return datetime;
-        }
+        const datetime = element.attr('datetime') || element.attr('content') || element.text().trim();
+        if (datetime) return datetime;
       }
     }
 
@@ -304,68 +212,92 @@ class NewspaperScraper {
   }
 
   extractContent($) {
-    // Remove unwanted elements first
-    $('script, style, nav, header, footer, aside, .ad, .advertisement, .social-share, .related-articles, .comments').remove();
-
-    const contentSelectors = [
-      'article[class*="content"]',
-      'div[class*="article-content"]',
-      'div[class*="article-body"]',
-      'div[class*="post-content"]',
-      'div[class*="entry-content"]',
-      '.article__body',
-      '.story-body',
-      '[itemprop="articleBody"]',
+    // Strategy 1: Look for article-specific containers
+    const articleSelectors = [
       'article',
+      '[role="article"]',
+      '.article-content',
+      '.article-body',
+      '.story-body',
+      '.post-content',
+      '.entry-content',
+      '[class*="article"][class*="content"]',
+      '[class*="article"][class*="body"]',
+      '[class*="post-content"]',
+      '[class*="story"][class*="body"]',
+      '[itemprop="articleBody"]',
       'main article',
-      'main',
-      '.content'
+      'main'
     ];
 
-    let bestContent = '';
-    let maxParagraphs = 0;
-
-    for (const selector of contentSelectors) {
+    for (const selector of articleSelectors) {
       const element = $(selector).first();
       if (element.length) {
-        // Clone to avoid modifying original
+        // Clone and clean
         const clone = element.clone();
         
-        // Remove unwanted nested elements
-        clone.find('script, style, .ad, .advertisement').remove();
+        // Remove unwanted elements
+        clone.find('script, style, nav, header, footer, aside, .ad, .advertisement, .social-share, .related-articles, .comments, iframe, [class*="ad"], [class*="promo"], [class*="widget"]').remove();
         
         const paragraphs = [];
         clone.find('p').each((i, el) => {
           const text = $(el).text().trim();
-          // Only include paragraphs with substantial text
-          if (text.length > 40) {
+          if (text.length > 30) { // Minimum paragraph length
             paragraphs.push(text);
           }
         });
 
-        if (paragraphs.length > maxParagraphs) {
-          maxParagraphs = paragraphs.length;
-          bestContent = paragraphs.join('\n\n');
+        if (paragraphs.length >= 3) { // At least 3 paragraphs
+          return paragraphs.join('\n\n');
         }
       }
     }
 
-    // If still no content, try getting all paragraphs
-    if (!bestContent || bestContent.length < 200) {
-      const allParagraphs = [];
-      $('p').each((i, el) => {
-        const text = $(el).text().trim();
-        if (text.length > 40 && text.length < 1000) {
-          allParagraphs.push(text);
-        }
-      });
+    // Strategy 2: Find all paragraphs and filter intelligently
+    const allParagraphs = [];
+    const seenText = new Set();
+    
+    $('p').each((i, el) => {
+      const text = $(el).text().trim();
       
-      if (allParagraphs.length > maxParagraphs) {
-        bestContent = allParagraphs.slice(0, 50).join('\n\n');
+      // Skip if too short, duplicate, or looks like navigation/footer
+      if (text.length < 30 || seenText.has(text)) return;
+      
+      // Skip common non-article text patterns
+      const skipPatterns = [
+        /^(share|tweet|comment|subscribe|follow us)/i,
+        /^(read more|continue reading|click here)/i,
+        /^(advertisement|sponsored)/i,
+        /^[\d\s]+$/,  // Just numbers
+        /^[^\w]+$/    // Just punctuation
+      ];
+      
+      if (skipPatterns.some(pattern => pattern.test(text))) return;
+      
+      seenText.add(text);
+      allParagraphs.push(text);
+    });
+
+    // Strategy 3: If we have enough paragraphs, use them
+    if (allParagraphs.length >= 5) {
+      return allParagraphs.join('\n\n');
+    }
+
+    // Strategy 4: Last resort - get all text from main content area
+    const bodySelectors = ['main', 'body', '#content', '.content'];
+    for (const selector of bodySelectors) {
+      const element = $(selector).first();
+      if (element.length) {
+        const clone = element.clone();
+        clone.find('script, style, nav, header, footer, aside').remove();
+        const text = clone.text().trim();
+        if (text.length > 200) {
+          return text.replace(/\s+/g, ' ').trim();
+        }
       }
     }
 
-    return bestContent || 'No content extracted';
+    return 'No content extracted - website may require login or has unusual structure';
   }
 
   extractTags($) {
@@ -390,79 +322,77 @@ class NewspaperScraper {
         
         if (text) {
           if (text.includes(',')) {
-            text.split(',').forEach(tag => {
-              const cleaned = tag.trim();
-              if (cleaned.length > 2 && cleaned.length < 50) {
-                tags.add(cleaned);
-              }
-            });
-          } else if (text.length > 2 && text.length < 50) {
+            text.split(',').forEach(tag => tags.add(tag.trim()));
+          } else {
             tags.add(text);
           }
         }
       });
     });
 
-    return Array.from(tags);
+    return Array.from(tags).filter(tag => tag.length > 0 && tag.length < 50);
   }
 
   extractImages($, baseUrl) {
     const images = [];
     const seen = new Set();
 
-    // Find all images
-    $('img').each((i, el) => {
-      const src = $(el).attr('src') || 
-                  $(el).attr('data-src') || 
-                  $(el).attr('data-lazy-src') ||
-                  $(el).attr('data-original');
-      
-      if (src) {
-        const absoluteUrl = this.makeAbsoluteUrl(src, baseUrl);
-        if (!seen.has(absoluteUrl) && this.isValidMediaUrl(absoluteUrl)) {
-          // Filter out small images (likely icons/logos)
-          const width = parseInt($(el).attr('width')) || 0;
-          const height = parseInt($(el).attr('height')) || 0;
-          
-          if (width < 100 && height < 100 && (width > 0 || height > 0)) {
-            return; // Skip small images
-          }
-
-          seen.add(absoluteUrl);
-          images.push({
-            url: absoluteUrl,
-            alt: $(el).attr('alt') || '',
-            title: $(el).attr('title') || ''
-          });
-        }
-      }
+    // Look for images in article content first
+    $('article img, .article img, [class*="article"] img, main img').each((i, el) => {
+      this.processImage($, el, baseUrl, images, seen);
     });
 
+    // If no images found, look everywhere
+    if (images.length === 0) {
+      $('img').each((i, el) => {
+        this.processImage($, el, baseUrl, images, seen);
+      });
+    }
+
     return images;
+  }
+
+  processImage($, el, baseUrl, images, seen) {
+    const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src');
+    if (src) {
+      const absoluteUrl = this.makeAbsoluteUrl(src, baseUrl);
+      
+      // Skip tiny images (likely icons/logos)
+      const width = parseInt($(el).attr('width')) || 0;
+      const height = parseInt($(el).attr('height')) || 0;
+      if (width > 0 && height > 0 && (width < 100 || height < 100)) {
+        return;
+      }
+      
+      if (!seen.has(absoluteUrl) && this.isValidMediaUrl(absoluteUrl)) {
+        seen.add(absoluteUrl);
+        images.push({
+          url: absoluteUrl,
+          alt: $(el).attr('alt') || '',
+          title: $(el).attr('title') || ''
+        });
+      }
+    }
   }
 
   extractVideos($, baseUrl) {
     const videos = [];
     const seen = new Set();
 
-    // HTML5 videos
     $('video source, video').each((i, el) => {
       const src = $(el).attr('src');
       if (src) {
         const absoluteUrl = this.makeAbsoluteUrl(src, baseUrl);
         if (!seen.has(absoluteUrl) && this.isValidMediaUrl(absoluteUrl)) {
           seen.add(absoluteUrl);
-          videos.push({ url: absoluteUrl, type: 'video' });
+          videos.push({ url: absoluteUrl });
         }
       }
     });
 
-    // Video embeds
     $('iframe').each((i, el) => {
       const src = $(el).attr('src');
-      if (src && (src.includes('youtube.com') || 
-                  src.includes('vimeo.com') || 
-                  src.includes('dailymotion.com'))) {
+      if (src && (src.includes('youtube.com') || src.includes('vimeo.com') || src.includes('dailymotion'))) {
         if (!seen.has(src)) {
           seen.add(src);
           videos.push({ url: src, type: 'embed' });
@@ -473,25 +403,19 @@ class NewspaperScraper {
     return videos;
   }
 
-  async discoverArticleLinksAlternative($, baseUrl) {
+  async discoverArticleLinks($, baseUrl) {
     const links = new Set();
-    const domain = new URL(baseUrl).hostname.replace(/^www\./, '');
+    const domain = new URL(baseUrl).hostname;
 
-    // More aggressive article link patterns
     const articleSelectors = [
       'article a[href]',
       '.article a[href]',
-      '.post a[href]',
-      '.story a[href]',
-      'a[href*="/article"]',
-      'a[href*="/news"]',
-      'a[href*="/story"]',
-      'a[href*="/post"]',
-      'a[href*="/blog"]',
+      'a[href*="/article/"]',
+      'a[href*="/news/"]',
+      'a[href*="/story/"]',
+      'a[href*="/post/"]',
       '[class*="article"] a[href]',
       '[class*="post"] a[href]',
-      '[class*="story"] a[href]',
-      'h1 a[href]',
       'h2 a[href]',
       'h3 a[href]',
       'h4 a[href]'
@@ -501,10 +425,9 @@ class NewspaperScraper {
       $(selector).each((i, el) => {
         const href = $(el).attr('href');
         if (href) {
+          const absoluteUrl = this.makeAbsoluteUrl(href, baseUrl);
           try {
-            const absoluteUrl = this.makeAbsoluteUrl(href, baseUrl);
-            const linkDomain = new URL(absoluteUrl).hostname.replace(/^www\./, '');
-            
+            const linkDomain = new URL(absoluteUrl).hostname;
             if (linkDomain === domain && this.looksLikeArticle(absoluteUrl)) {
               links.add(absoluteUrl);
             }
@@ -520,93 +443,68 @@ class NewspaperScraper {
 
   looksLikeArticle(url) {
     const articlePatterns = [
-      /\/article[s]?[\/\-]/i,
-      /\/news[\/\-]/i,
-      /\/story[\/\-]/i,
-      /\/stories[\/\-]/i,
-      /\/post[s]?[\/\-]/i,
-      /\/blog[\/\-]/i,
-      /\/\d{4}\/\d{1,2}\/\d{1,2}\//,  // Date-based: /2024/01/15/
-      /\/\d{4}-\d{2}-\d{2}/,           // Date-based: /2024-01-15
-      /\/press[\/\-]/i,
-      /\/report[s]?[\/\-]/i,
-      /\/feature[s]?[\/\-]/i,
-      /\/opinion[s]?[\/\-]/i,
-      /\/analysis[\/\-]/i,
-      /-\d{6,}$/,                       // Ends with ID: article-123456
-      /\/id\/\d+/i,
-      /\/p\/[\w-]+/i
+      /\/article\//,
+      /\/news\//,
+      /\/story\//,
+      /\/post\//,
+      /\/\d{4}\/\d{2}\/\d{2}\//,
+      /\/blog\//,
+      /\/press\//,
+      /\/\d{4}\//
     ];
 
     const excludePatterns = [
-      /\/(tag|category|author|search|page|about|contact|privacy|terms|subscribe)[\/\?]/i,
-      /\.(jpg|jpeg|png|gif|pdf|xml|json|css|js)$/i,
+      /\/(tag|category|author|search|page|archive)\//,
+      /\.(jpg|png|gif|pdf|xml|json|css|js)$/i,
       /#$/,
-      /\/gallery\//i,
-      /\/video[s]?\/?$/i,
-      /\/podcast[s]?\/?$/i,
-      /\/feed/i,
-      /\/rss/i,
-      /login|signin|signup|register/i
+      /\?p=/,
+      /\/feed\//,
+      /\/wp-/
     ];
 
     const hasArticlePattern = articlePatterns.some(pattern => pattern.test(url));
     const hasExcludePattern = excludePatterns.some(pattern => pattern.test(url));
 
-    // Must have article pattern AND not have exclude pattern
     return hasArticlePattern && !hasExcludePattern;
   }
 
   makeAbsoluteUrl(url, baseUrl) {
     try {
-      if (!url) return '';
-      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+      if (url.startsWith('http')) return url;
       if (url.startsWith('//')) return 'https:' + url;
-      if (url.startsWith('/')) {
-        const base = new URL(baseUrl);
-        return `${base.protocol}//${base.host}${url}`;
-      }
       return new URL(url, baseUrl).href;
     } catch {
-      return '';
+      return url;
     }
   }
 
   isValidMediaUrl(url) {
-    if (!url) return false;
     try {
       const parsed = new URL(url);
-      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
-             !url.includes('data:image') &&
-             !url.includes('placeholder');
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
     } catch {
       return false;
     }
   }
 
   async autoScroll(page) {
-    try {
-      await page.evaluate(async () => {
-        await new Promise((resolve) => {
-          let totalHeight = 0;
-          const distance = 300;
-          const maxScroll = 5000; // Don't scroll forever
-          const timer = setInterval(() => {
-            const scrollHeight = document.body.scrollHeight;
-            window.scrollBy(0, distance);
-            totalHeight += distance;
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let totalHeight = 0;
+        const distance = 100;
+        const timer = setInterval(() => {
+          const scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance);
+          totalHeight += distance;
 
-            if (totalHeight >= scrollHeight || totalHeight >= maxScroll) {
-              clearInterval(timer);
-              resolve();
-            }
-          }, 200);
-        });
+          if (totalHeight >= scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 100);
       });
-      await page.waitForTimeout(config.scrollDelay);
-    } catch (e) {
-      console.error('Scroll failed:', e.message);
-    }
+    });
+    await page.waitForTimeout(config.scrollDelay);
   }
 
   delay(ms) {
