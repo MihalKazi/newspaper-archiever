@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search Archives - Newspaper Archiver</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 40px;
+    }
+    .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      margin-bottom: 20px;
+    }
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .search-input {
+      flex: 1;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .search-btn {
+      padding: 15px 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .search-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+      padding: 20px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+    .filter-group label {
+      display: block;
+      font-size: 0.9em;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    .filter-group input, .filter-group select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    .results-count {
+      font-size: 1.1em;
+      color: #666;
+    }
+    .result-item {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 20px 0;
+    }
+    .result-item:last-child { border-bottom: none; }
+    .result-title {
+      font-size: 1.3em;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .result-title a {
+      color: #667eea;
+      text-decoration: none;
+    }
+    .result-title a:hover {
+      text-decoration: underline;
+    }
+    .result-meta {
+      display: flex;
+      gap: 20px;
+      font-size: 0.85em;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    .result-excerpt {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+    .result-excerpt mark {
+      background: #fef3c7;
+      padding: 2px 4px;
+      font-weight: 600;
+    }
+    .back-btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background: white;
+      color: #667eea;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .back-btn:hover { background: #f0f0f0; }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    .no-results {
+      text-align: center;
+      padding: 60px;
+      color: #666;
+    }
+    .no-results h3 {
+      font-size: 1.5em;
+      margin-bottom: 10px;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      padding: 15px;
+      background: #f0f9ff;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .stat-item {
+      flex: 1;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 1.5em;
+      font-weight: 600;
+      color: #667eea;
+    }
+    .stat-label {
+      font-size: 0.85em;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔍 Search Archives</h1>
+      <p>Search across all your archived articles</p>
+    </div>
+    
+    <a href="/" class="back-btn">← Back to Archiver</a>
+    
+    <div class="card">
+      <div class="search-box">
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input" 
+          placeholder="Search by title, content, author, or tags..."
+        >
+        <button onclick="performSearch()" class="search-btn">🔍 Search</button>
+      </div>
+
+      <div class="filters">
+        <div class="filter-group">
+          <label for="domainFilter">Website</label>
+          <select id="domainFilter">
+            <option value="">All websites</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Author</label>
+          <input type="text" id="authorFilter" placeholder="Filter by author">
+        </div>
+        <div class="filter-group">
+          <label>From Date</label>
+          <input type="date" id="dateFromFilter" title="Select the start date for filtering articles">
+        </div>
+        <div class="filter-group">
+          <label>To Date</label>
+          <input type="date" id="dateToFilter" title="Select the end date for filtering articles">
+        </div>
+        <div class="filter-group">
+          <label>Sort By</label>
+          <select id="sortByFilter" title="Sort search results by relevance, date, or title">
+            <option value="relevance">Relevance</option>
+            <option value="date">Date (Newest)</option>
+            <option value="title">Title (A-Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="statsBar" class="stats-bar" style="display: none;">
+        <div class="stat-item">
+          <div class="stat-value" id="totalArticles">0</div>
+          <div class="stat-label">Total Articles</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="totalDomains">0</div>
+          <div class="stat-label">Websites</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="totalAuthors">0</div>
+          <div class="stat-label">Authors</div>
+        </div>
+      </div>
+
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <script>
+    let stats = null;
+
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/search/stats');
+        stats = await response.json();
+        
+        document.getElementById('totalArticles').textContent = stats.totalArticles;
+        document.getElementById('totalDomains').textContent = stats.domains.length;
+        document.getElementById('totalAuthors').textContent = stats.authors.length;
+        document.getElementById('statsBar').style.display = 'flex';
+
+        const domainFilter = document.getElementById('domainFilter');
+        stats.domains.forEach(domain => {
+          const option = document.createElement('option');
+          option.value = domain;
+          option.textContent = domain;
+          domainFilter.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      }
+    }
+
+    async function performSearch() {
+      const query = document.getElementById('searchInput').value;
+      const domain = document.getElementById('domainFilter').value;
+      const author = document.getElementById('authorFilter').value;
+      const dateFrom = document.getElementById('dateFromFilter').value;
+      const dateTo = document.getElementById('dateToFilter').value;
+      const sortBy = document.getElementById('sortByFilter').value;
+
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<div class="loading">🔍 Searching...</div>';
+
+      try {
+        const params = new URLSearchParams();
+        if (query) params.append('q', query);
+        if (domain) params.append('domain', domain);
+        if (author) params.append('author', author);
+        if (dateFrom) params.append('dateFrom', dateFrom);
+        if (dateTo) params.append('dateTo', dateTo);
+        if (sortBy) params.append('sortBy', sortBy);
+
+        const response = await fetch('/api/search?' + params.toString());
+        const data = await response.json();
+
+        displayResults(data, query);
+      } catch (error) {
+        resultsDiv.innerHTML = '<div class="no-results"><h3>Error</h3><p>' + error.message + '</p></div>';
+      }
+    }
+
+    function displayResults(data, query) {
+      const resultsDiv = document.getElementById('results');
+
+      if (data.count === 0) {
+        resultsDiv.innerHTML = `
+          <div class="no-results">
+            <h3>No results found</h3>
+            <p>Try different keywords or adjust your filters</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '<div class="results-header">';
+      html += '<div class="results-count">Found <strong>' + data.count + '</strong> articles</div>';
+      html += '</div>';
+
+      data.results.forEach(article => {
+        const date = new Date(article.publishDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+
+        const excerpt = getExcerpt(article.content, query);
+        const highlightedExcerpt = highlightText(excerpt, query);
+
+        html += `
+          <div class="result-item">
+            <div class="result-title">
+              <a href="/browse/${article.domain}">${article.title}</a>
+            </div>
+            <div class="result-meta">
+              <span>📰 ${article.domain}</span>
+              <span>📅 ${date}</span>
+              <span>✍️ ${article.author}</span>
+              <span>📝 ${article.wordCount} words</span>
+            </div>
+            <div class="result-excerpt">${highlightedExcerpt}</div>
+          </div>
+        `;
+      });
+
+      resultsDiv.innerHTML = html;
+    }
+
+    function getExcerpt(content, query) {
+      if (!content) return '';
+      if (!query) return content.substring(0, 200) + '...';
+
+      const lowerContent = content.toLowerCase();
+      const lowerQuery = query.toLowerCase();
+      const index = lowerContent.indexOf(lowerQuery);
+
+      if (index === -1) {
+        return content.substring(0, 200) + '...';
+      }
+
+      const start = Math.max(0, index - 100);
+      const end = Math.min(content.length, index + 200);
+      let excerpt = content.substring(start, end);
+
+      if (start > 0) excerpt = '...' + excerpt;
+      if (end < content.length) excerpt = excerpt + '...';
+
+      return excerpt;
+    }
+
+    function highlightText(text, query) {
+      if (!query) return text;
+
+      const words = query.split(/\s+/);
+      let highlighted = text;
+
+      words.forEach(word => {
+        if (word.length < 3) return;
+        const regex = new RegExp('(' + word + ')', 'gi');
+        highlighted = highlighted.replace(regex, '<mark>$1</mark>');
+      });
+
+      return highlighted;
+    }
+
+    document.getElementById('searchInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        performSearch();
+      }
+    });
+
+    window.onload = () => {
+      loadStats();
+    };
+  </script>
+</body>
+</html>

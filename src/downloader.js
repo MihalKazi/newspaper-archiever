@@ -11,15 +11,23 @@ class MediaDownloader {
     this.downloadedHashes = new Set();
   }
 
-  async downloadMedia(article, articleId) {
+  generateSafeId(url) {
+    // Generate a safe ID from URL (hash only)
+    return crypto.createHash('md5').update(url).digest('hex').substring(0, 12);
+  }
+
+  async downloadMedia(article, articleUrl) {
     const mediaFiles = {
       images: [],
       videos: [],
       pdfs: []
     };
 
-    // Create temporary media directory
-    const tempMediaDir = path.join(this.baseDir, 'media', 'temp', articleId);
+    // Create safe article ID from URL
+    const safeArticleId = this.generateSafeId(articleUrl);
+    
+    // Create temporary media directory with SAFE name
+    const tempMediaDir = path.join(this.baseDir, 'media', 'temp', safeArticleId);
     await fs.mkdir(tempMediaDir, { recursive: true });
 
     // Download images
@@ -30,7 +38,7 @@ class MediaDownloader {
           const filePath = await this.downloadFile(
             image.url,
             tempMediaDir,
-            `image_${i + 1}`,
+            'image_' + (i + 1),
             image.alt || image.title
           );
           if (filePath) {
@@ -42,7 +50,7 @@ class MediaDownloader {
             });
           }
         } catch (error) {
-          console.error(`Failed to download image ${image.url}:`, error.message);
+          console.error('Failed to download image ' + image.url + ': ' + error.message);
         }
       }
     }
@@ -56,7 +64,7 @@ class MediaDownloader {
             const filePath = await this.downloadFile(
               video.url,
               tempMediaDir,
-              `video_${i + 1}`
+              'video_' + (i + 1)
             );
             if (filePath) {
               mediaFiles.videos.push({
@@ -65,7 +73,7 @@ class MediaDownloader {
               });
             }
           } catch (error) {
-            console.error(`Failed to download video ${video.url}:`, error.message);
+            console.error('Failed to download video ' + video.url + ': ' + error.message);
           }
         } else {
           // For embeds, just save the URL
@@ -103,21 +111,25 @@ class MediaDownloader {
       
       if (!extension) {
         // Try to get extension from URL
-        const urlPath = new URL(url).pathname;
-        extension = path.extname(urlPath).substring(1) || 'bin';
+        try {
+          const urlPath = new URL(url).pathname;
+          extension = path.extname(urlPath).substring(1) || 'bin';
+        } catch (e) {
+          extension = 'bin';
+        }
       }
 
-      // Create filename
+      // Create filename - sanitize description
       let filename;
       if (description) {
-        const sanitizedDesc = sanitize(description.substring(0, 30));
-        filename = `${baseName}_${sanitizedDesc}.${extension}`;
+        const sanitizedDesc = sanitize(description.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '-'));
+        filename = baseName + '_' + sanitizedDesc + '.' + extension;
       } else {
-        filename = `${baseName}.${extension}`;
+        filename = baseName + '.' + extension;
       }
 
-      // Clean up filename (remove double extensions, etc.)
-      filename = filename.replace(/\.\./g, '.');
+      // Clean up filename (remove double extensions, multiple dashes, etc.)
+      filename = filename.replace(/\.\./g, '.').replace(/--+/g, '-');
 
       const filePath = path.join(targetDir, filename);
       await fs.writeFile(filePath, response.data);
@@ -125,7 +137,7 @@ class MediaDownloader {
       this.downloadedHashes.add(fileHash);
       return path.relative(this.baseDir, filePath);
     } catch (error) {
-      throw new Error(`Download failed: ${error.message}`);
+      throw new Error('Download failed: ' + error.message);
     }
   }
 
@@ -133,20 +145,22 @@ class MediaDownloader {
     return crypto.createHash('md5').update(url).digest('hex');
   }
 
-  async saveThumbnail(screenshot, articleId) {
+  async saveThumbnail(screenshot, articleUrl) {
     if (!screenshot) return null;
 
     try {
-      const tempMediaDir = path.join(this.baseDir, 'media', 'temp', articleId);
+      // Generate safe ID from URL
+      const safeArticleId = this.generateSafeId(articleUrl);
+      const tempMediaDir = path.join(this.baseDir, 'media', 'temp', safeArticleId);
       await fs.mkdir(tempMediaDir, { recursive: true });
 
-      const filename = `screenshot.png`;
+      const filename = 'screenshot.png';
       const filePath = path.join(tempMediaDir, filename);
       
       await fs.writeFile(filePath, screenshot);
       return path.relative(this.baseDir, filePath);
     } catch (error) {
-      console.error('Failed to save screenshot:', error.message);
+      console.error('Failed to save screenshot: ' + error.message);
       return null;
     }
   }
