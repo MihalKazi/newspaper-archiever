@@ -10,9 +10,33 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const searchEngine = new SearchEngine();
 
+// CRITICAL: CORS middleware for browser extension
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/archives', express.static(path.join(__dirname, '../archives')));
+
+// Health check endpoint for extension
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    running: true,
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Browse all archives
 app.get('/browse', async (req, res) => {
@@ -385,9 +409,10 @@ app.post('/api/scrape', async (req, res) => {
       message: message,
       level: level
     });
-    console.log('[' + new Date().toLocaleTimeString() + ']' + message);
+    console.log('[' + new Date().toLocaleTimeString() + '] ' + message);
   };
 
+  // Start scraping in background
   (async () => {
     const scraper = new NewspaperScraper();
     
@@ -404,7 +429,7 @@ app.post('/api/scrape', async (req, res) => {
 
         const article = await scraper.scrapeArticle(url, (update) => {
           if (update.status === 'loading') {
-            addLog('loading');
+            addLog('Loading article...');
           } else if (update.status === 'error') {
             addLog('Error: ' + update.error, 'error');
           }
@@ -415,6 +440,7 @@ app.post('/api/scrape', async (req, res) => {
         }
 
         addLog('Article extracted: ' + article.title);
+        addLog('Publication date: ' + article.publishDate);
         job.progress = 60;
 
         const storage = new StorageManager(url);
@@ -458,6 +484,7 @@ app.post('/api/scrape', async (req, res) => {
         }
 
       } else {
+        // Bulk mode
         addLog('Discovering articles...');
         job.status = 'discovering';
         job.progress = 20;
@@ -522,7 +549,7 @@ app.post('/api/scrape', async (req, res) => {
     }
   })();
 
-  res.json({ jobId: jobId });
+  res.json({ jobId: jobId, status: 'started', mode: mode });
 });
 
 app.get('/api/status/:jobId', (req, res) => {
@@ -535,12 +562,25 @@ app.get('/api/status/:jobId', (req, res) => {
   res.json(job);
 });
 
+app.get('/api/jobs', (req, res) => {
+  const jobList = Array.from(jobs.values());
+  res.json(jobList);
+});
+
 app.listen(PORT, async () => {
   console.log('');
-  console.log('🚀 Newspaper Archiver is running!');
-  console.log('📰 Archive articles: http://localhost:' + PORT);
-  console.log('📚 Browse archives: http://localhost:' + PORT + '/browse');
-  console.log('🔍 Search archives: http://localhost:' + PORT + '/search');
+  console.log('╔════════════════════════════════════════════════════════════╗');
+  console.log('║                                                            ║');
+  console.log('║        📰 Newspaper Archiver Server Running!               ║');
+  console.log('║                                                            ║');
+  console.log('║  📄 Archive: http://localhost:' + PORT + '                        ║');
+  console.log('║  📚 Browse:  http://localhost:' + PORT + '/browse                 ║');
+  console.log('║  🔍 Search:  http://localhost:' + PORT + '/search                 ║');
+  console.log('║  ✅ Health:  http://localhost:' + PORT + '/api/health             ║');
+  console.log('║                                                            ║');
+  console.log('║  🔌 Browser Extension: Server ready for connections       ║');
+  console.log('║                                                            ║');
+  console.log('╚════════════════════════════════════════════════════════════╝');
   console.log('');
   
   try {
@@ -550,5 +590,7 @@ app.listen(PORT, async () => {
   } catch (error) {
     console.log('⚠️  No archives found yet. Search will be available after archiving articles.');
   }
+  console.log('');
+  console.log('Press Ctrl+C to stop the server');
   console.log('');
 });
